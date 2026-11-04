@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cyber Rogue: Infinite Protocol 2026 — Procedural Level Roguelike</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: #05070e; color: #f8fafc; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+    #hud { position: fixed; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.88); border: 1px solid #334155; padding: 8px 14px; border-radius: 10px; z-index: 10; backdrop-filter: blur(6px); flex-wrap: wrap; gap: 8px; }
+    .hud-group { display: flex; gap: 14px; align-items: center; font-size: 13px; font-weight: 700; }
+    .mutator-pill { background: linear-gradient(135deg, #7c3aed, #db2777); padding: 3px 10px; border-radius: 99px; font-size: 11px; color: #fff; }
+    canvas { border: 2px solid #1e293b; border-radius: 12px; background: #070b14; box-shadow: 0 0 45px rgba(99, 102, 241, 0.25); max-width: 98vw; max-height: 82vh; }
+    .modal { position: fixed; inset: 0; background: rgba(3, 7, 18, 0.88); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20; padding: 20px; }
+    .modal.active { display: flex; }
+    .modal-box { background: #0f172a; border: 2px solid #6366f1; border-radius: 16px; padding: 22px; max-width: 680px; width: 100%; text-align: center; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.75); }
+    .draft-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .draft-card { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 14px 10px; cursor: pointer; transition: 0.18s; display: flex; flex-direction: column; gap: 6px; }
+    .draft-card:hover { border-color: #38bdf8; transform: translateY(-4px); background: #1e1b4b; }
+    .btn { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 13px; }
+    .btn.gold { background: linear-gradient(135deg, #f59e0b, #ea580c); }
+    .btn.green { background: linear-gradient(135deg, #10b981, #059669); }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div class="hud-group">
+      <span style="color:#38bdf8;">🏆 STAGE <span id="uiLevel">1</span></span>
+      <span style="color:#4ade80;">❤️ HP: <span id="uiHp">100/100</span></span>
+      <span style="color:#facc15;">💰 GOLD: <span id="uiGold">0</span></span>
+      <span style="color:#c084fc;">⚡ XP LV.<span id="uiXpLv">1</span></span>
+      <span style="color:#f87171;">⏱️ WAVE: <span id="uiTimer">30</span>s</span>
+    </div>
+    <div class="hud-group">
+      <span id="uiMutation" class="mutator-pill">🎲 Seed #0000 • Normal Protocol</span>
+      <button id="btnSelectStage" class="btn" style="padding:4px 10px;font-size:11px;">🗺️ Choose Stage / Shop</button>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas" width="960" height="580"></canvas>
+
+  <!-- 3-CARD PROCEDURAL SKILL DRAFT MODAL -->
+  <div id="draftModal" class="modal">
+    <div class="modal-box">
+      <h2 id="draftTitle" style="color:#38bdf8;">⚡ LEVEL UP! CHOOSE 1 OF 3 PROCEDURAL UPGRADES</h2>
+      <p style="color:#94a3b8;font-size:13px;">Every run & replay drafts a different combination of weapons and cybernetic passives!</p>
+      <div id="draftGrid" class="draft-grid"></div>
+    </div>
+  </div>
+
+  <!-- STAGE SELECT / META SHOP / REPLAY MODAL -->
+  <div id="stageModal" class="modal">
+    <div class="modal-box">
+      <h2 id="stageModalTitle" style="color:#facc15;">🗺️ STAGE SELECT & PERMANENT META-SHOP</h2>
+      <p id="stageModalSub" style="color:#cbd5e1;font-size:13px;">Replay any unlocked stage with a 100% brand-new procedural map seed, hazard layout & enemy mutation!</p>
+      <div id="stageButtons" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;">
+        <button id="buyMetaDmg" class="btn gold">⚔️ +15% Base DMG (50g)</button>
+        <button id="buyMetaHp" class="btn gold">🛡️ +25 Max HP (50g)</button>
+        <button id="buyMetaSpd" class="btn gold">👟 +10% Move Speed (50g)</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:6px;">
+        <button id="btnRewardedAd" class="btn green">📺 Watch Ad (+150 Gold / Full Revive)</button>
+        <button id="btnCloseStageModal" class="btn">▶️ Launch Stage (New Procedural Seed)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // COMMERCIAL AD-NETWORK SDK BRIDGE (GameMonetize / GameDistribution / Poki / CrazyGames)
+    // =========================================================================
+    window.CommercialAdBridge = {
+      showInterstitial(reason, onDone) {
+        console.log('[AdSDK] Interstitial triggered:', reason);
+        if (window.sdk && typeof window.sdk.showBanner === 'function') {
+          try { window.sdk.showBanner(); } catch (e) {}
+        }
+        if (window.CrazyGames && window.CrazyGames.SDK && window.CrazyGames.SDK.ad) {
+          try { window.CrazyGames.SDK.ad.requestAd('midgame', { adFinished: onDone, adError: onDone }); return; } catch (e) {}
+        }
+        if (onDone) onDone();
+      },
+      showRewarded(onReward) {
+        console.log('[AdSDK] Rewarded Ad triggered');
+        if (window.sdk && typeof window.sdk.showBanner === 'function') {
+          try { window.sdk.showBanner(); } catch (e) {}
+        }
+        if (onReward) onReward();
+      }
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Persistent Save State
+    const save = JSON.parse(localStorage.getItem('cyber_rogue_save_v2') || '{"maxStage":1,"gold":100,"metaDmg":1,"metaHp":0,"metaSpd":1}');
+    function persistSave() { localStorage.setItem('cyber_rogue_save_v2', JSON.stringify(save)); }
+
+    // Procedural Mutations (Even replaying the exact same stage gives a totally different mutation & layout!)
+    const MUTATIONS = [
+      { name: "Swarm Overdrive", desc: "2x Enemy Spawn Rate, -30% Enemy HP, +35% Gold Drops", spawnMult: 1.8, hpMult: 0.7, spdMult: 1.2, goldMult: 1.35 },
+      { name: "Titan Armor Protocol", desc: "Enemies have +80% HP & Knockback Resist, +60% XP", spawnMult: 0.85, hpMult: 1.8, spdMult: 0.9, goldMult: 1.5 },
+      { name: "Bullet-Hell Nexus", desc: "Ranged Cyber-Snipers & Boss Turrets fire 2x projectiles", spawnMult: 1.15, hpMult: 1.1, spdMult: 1.15, goldMult: 1.4 },
+      { name: "Quantum Splitter", desc: "Enemies split into 2 mini-drones on death!", spawnMult: 1.0, hpMult: 1.0, spdMult: 1.25, goldMult: 1.6, splitter: true },
+      { name: "Plasma Storm Arena", desc: "High-voltage hazard zones & healing shrines spawn across map", spawnMult: 1.25, hpMult: 1.15, spdMult: 1.2, goldMult: 1.5 }
+    ];
+
+    const UPGRADE_POOL = [
+      { id: 'multishot', title: '🔥 Twin-Linked Plasma (+1 Projectile)', desc: 'Fires +1 additional homing plasma bolt per shot', apply: (p) => { p.projectiles += 1; } },
+      { id: 'firerate', title: '⚡ Overclocked Trigger (+30% Fire Rate)', desc: 'Reduces weapon cooldown by 25%', apply: (p) => { p.fireDelay = Math.max(5, Math.floor(p.fireDelay * 0.76)); } },
+      { id: 'orbitals', title: '🛰️ Cyber Sawblade Orbitals (+1 Blade)', desc: 'Spawns a rotating plasma sawblade that shreds nearby foes', apply: (p) => { p.orbitals += 1; } },
+      { id: 'chain', title: '🌩️ Tesla Chain Lightning (+1 Bounce)', desc: 'Shots arc to nearby enemies for 65% damage', apply: (p) => { p.chainBounces += 1; } },
+      { id: 'nova', title: '💥 EMP Shockwave Pulse', desc: 'Emits an AoE damage + slow shockwave every 4 seconds', apply: (p) => { p.novaLevel += 1; } },
+      { id: 'vamp', title: '🩸 Nanobot Leech (+4 HP on Elite Kill & Heal)', desc: 'Restores 35% HP immediately + increases Max HP by 30', apply: (p) => { p.maxHp += 30; p.hp = Math.min(p.maxHp, p.hp + 45); } },
+      { id: 'crit', title: '🎯 Quantum Crit Matrix (+35% Damage & Pierce)', desc: 'Bolts pierce through +1 additional target & deal +35% DMG', apply: (p) => { p.pierce += 1; p.dmg *= 1.35; } }
+    ];
+
+    let currentStage = save.maxStage || 1;
+    let runSeed = 1000;
+    let activeMutation = MUTATIONS[0];
+    let stageTimer = 30;
+    let paused = false;
+    let keys = {};
+    let pointer = { x: 480, y: 290, active: false };
+
+    let player = {};
+    let obstacles = [];
+    let zones = [];
+    let enemies = [];
+    let bullets = [];
+    let enemyBullets = [];
+    let gems = [];
+    let particles = [];
+    let frameCount = 0;
+
+    function resetRunForStage(stageNum) {
+      currentStage = stageNum;
+      runSeed = Math.floor(1000 + Math.random() * 9000);
+      // Every replay of the same stage picks a fresh unpredictable mutation + obstacle layout!
+      activeMutation = MUTATIONS[Math.floor(Math.random() * MUTATIONS.length)];
+      stageTimer = 28 + Math.min(32, stageNum * 2);
+
+      player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        r: 14,
+        hp: 100 + save.metaHp,
+        maxHp: 100 + save.metaHp,
+        spd: 3.6 * save.metaSpd,
+        dmg: (18 + stageNum * 3) * save.metaDmg,
+        fireDelay: 18,
+        fireCd: 0,
+        projectiles: 1,
+        pierce: 0,
+        orbitals: 0,
+        chainBounces: 0,
+        novaLevel: 0,
+        xp: 0,
+        xpNext: 40,
+        xpLv: 1
+      };
+
+      obstacles = [];
+      zones = [];
+      enemies = [];
+      bullets = [];
+      enemyBullets = [];
+      gems = [];
+      particles = [];
+
+      // Procedurally generate 5-9 arena obstacles (pillars/barriers) avoiding center spawn
+      const obsCount = 4 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < obsCount; i++) {
+        const w = 44 + Math.random() * 50;
+        const h = 44 + Math.random() * 50;
+        const ox = 70 + Math.random() * (canvas.width - 140 - w);
+        const oy = 70 + Math.random() * (canvas.height - 140 - h);
+        if (Math.hypot(ox + w / 2 - player.x, oy + h / 2 - player.y) > 120) {
+          obstacles.push({ x: ox, y: oy, w, h });
+        }
+      }
+
+      // Procedurally generate 3 interactive floor zones (Healing Shrine / Overcharge Pad / Plasma Hazard)
+      const zoneTypes = ['heal', 'haste', 'hazard'];
+      for (let i = 0; i < 3; i++) {
+        zones.push({
+          x: 110 + Math.random() * (canvas.width - 220),
+          y: 110 + Math.random() * (canvas.height - 220),
+          r: 42 + Math.random() * 20,
+          type: zoneTypes[i % zoneTypes.length]
+        });
+      }
+
+      updateHud();
+    }
+
+    function spawnEnemy(isBoss = false) {
+      const edge = Math.floor(Math.random() * 4);
+      let x = edge === 0 ? 20 : edge === 1 ? canvas.width - 20 : Math.random() * canvas.width;
+      let y = edge === 2 ? 20 : edge === 3 ? canvas.height - 20 : Math.random() * canvas.height;
+      const archetypes = ['rusher', 'tank', 'sniper', 'dasher'];
+      const kind = isBoss ? 'boss' : archetypes[Math.floor(Math.random() * archetypes.length)];
+      const baseHp = (22 + currentStage * 14) * activeMutation.hpMult;
+      enemies.push({
+        x, y,
+        r: isBoss ? 28 : kind === 'tank' ? 17 : 12,
+        hp: isBoss ? baseHp * 12 : kind === 'tank' ? baseHp * 2.4 : baseHp,
+        maxHp: isBoss ? baseHp * 12 : kind === 'tank' ? baseHp * 2.4 : baseHp,
+        spd: (isBoss ? 1.35 : kind === 'rusher' ? 2.3 : kind === 'dasher' ? 2.7 : 1.55) * activeMutation.spdMult,
+        kind,
+        isBoss,
+        shootCd: 70 + Math.floor(Math.random() * 60)
+      });
+    }
+
+    function openSkillDraft() {
+      paused = true;
+      const modal = document.getElementById('draftModal');
+      const grid = document.getElementById('draftGrid');
+      grid.innerHTML = '';
+      const shuffled = [...UPGRADE_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
+      shuffled.forEach(u => {
+        const card = document.createElement('div');
+        card.className = 'draft-card';
+        card.innerHTML = `<div style="font-weight:800;color:#38bdf8;font-size:14px;">${u.title}</div><div style="font-size:12px;color:#cbd5e1;">${u.desc}</div>`;
+        card.addEventListener('click', () => {
+          u.apply(player);
+          modal.classList.remove('active');
+          paused = false;
+          updateHud();
+        });
+        grid.appendChild(card);
+      });
+      modal.classList.add('active');
+    }
+
+    function openStageModal(titleText, subText) {
+      paused = true;
+      document.getElementById('stageModalTitle').textContent = titleText || '🗺️ STAGE SELECT & PERMANENT META-SHOP';
+      document.getElementById('stageModalSub').textContent = subText || 'Replay any stage for a 100% new procedural map & enemy mutation, or push to the next stage!';
+      const wrap = document.getElementById('stageButtons');
+      wrap.innerHTML = '';
+      const totalShow = Math.max(10, save.maxStage + 2);
+      for (let s = 1; s <= totalShow; s++) {
+        const b = document.createElement('button');
+        const unlocked = s <= save.maxStage;
+        b.className = 'btn';
+        b.style.background = s === currentStage ? '#10b981' : unlocked ? '#334155' : '#1e293b';
+        b.style.opacity = unlocked ? '1' : '0.45';
+        b.textContent = unlocked ? `Stage ${s}` : `🔒 ${s}`;
+        if (unlocked) {
+          b.addEventListener('click', () => {
+            currentStage = s;
+            openStageModal(`🎯 Selected Stage ${s} (New Procedural Seed Ready)`, 'Click Launch Stage below to generate a fresh procedural layout!');
+          });
+        }
+        wrap.appendChild(b);
+      }
+      document.getElementById('stageModal').classList.add('active');
+    }
+
+    document.getElementById('btnSelectStage').addEventListener('click', () => openStageModal());
+    document.getElementById('btnCloseStageModal').addEventListener('click', () => {
+      document.getElementById('stageModal').classList.remove('active');
+      paused = false;
+      resetRunForStage(currentStage);
+    });
+
+    document.getElementById('buyMetaDmg').addEventListener('click', () => {
+      if (save.gold >= 50) { save.gold -= 50; save.metaDmg = +(save.metaDmg + 0.15).toFixed(2); persistSave(); updateHud(); }
+    });
+    document.getElementById('buyMetaHp').addEventListener('click', () => {
+      if (save.gold >= 50) { save.gold -= 50; save.metaHp += 25; persistSave(); updateHud(); }
+    });
+    document.getElementById('buyMetaSpd').addEventListener('click', () => {
+      if (save.gold >= 50) { save.gold -= 50; save.metaSpd = +(save.metaSpd + 0.1).toFixed(2); persistSave(); updateHud(); }
+    });
+    document.getElementById('btnRewardedAd').addEventListener('click', () => {
+      window.CommercialAdBridge.showRewarded(() => {
+        save.gold += 150;
+        player.hp = player.maxHp;
+        persistSave();
+        updateHud();
+      });
+    });
+
+    function updateHud() {
+      document.getElementById('uiLevel').textContent = currentStage + ' (Max ' + save.maxStage + ')';
+      document.getElementById('uiHp').textContent = Math.max(0, Math.ceil(player.hp)) + '/' + player.maxHp;
+      document.getElementById('uiGold').textContent = save.gold;
+      document.getElementById('uiXpLv').textContent = player.xpLv;
+      document.getElementById('uiTimer').textContent = stageTimer;
+      document.getElementById('uiMutation').textContent = `🎲 Seed #${runSeed} • ${activeMutation.name}`;
+    }
+
+    window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+    window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      pointer.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    });
+
+    // 1-second stage survival timer
+    setInterval(() => {
+      if (paused) return;
+      stageTimer--;
+      if (stageTimer === 10) {
+        // Spawn Stage Boss!
+        spawnEnemy(true);
+      }
+      if (stageTimer <= 0) {
+        const clearedStage = currentStage;
+        const bonusGold = Math.floor((35 + clearedStage * 15) * activeMutation.goldMult);
+        save.gold += bonusGold;
+        if (clearedStage >= save.maxStage) save.maxStage = clearedStage + 1;
+        currentStage = clearedStage + 1;
+        persistSave();
+        window.CommercialAdBridge.showInterstitial('stage_clear', () => {
+          openStageModal(`🏆 STAGE ${clearedStage} CLEARED! (+${bonusGold} GOLD)`, `Unlocked Stage ${save.maxStage}! Replay Stage ${clearedStage} with a brand-new procedural map or advance to Stage ${currentStage}!`);
+        });
+      }
+      updateHud();
+    }, 1000);
+
+    function rectCircleCollide(rx, ry, rw, rh, cx, cy, cr) {
+      const testX = Math.max(rx, Math.min(cx, rx + rw));
+      const testY = Math.max(ry, Math.min(cy, ry + rh));
+      return Math.hypot(cx - testX, cy - testY) <= cr;
+    }
+
+    function gameLoop() {
+      requestAnimationFrame(gameLoop);
+      if (paused) return;
+      frameCount++;
+
+      // Movement
+      let dx = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
+      let dy = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
+      let spdMult = 1;
+      zones.forEach(z => {
+        if (Math.hypot(player.x - z.x, player.y - z.y) < z.r) {
+          if (z.type === 'heal' && frameCount % 30 === 0) player.hp = Math.min(player.maxHp, player.hp + 2);
+          if (z.type === 'haste') spdMult = 1.45;
+          if (z.type === 'hazard' && frameCount % 25 === 0) player.hp -= 3;
+        }
+      });
+
+      if (dx || dy) {
+        const len = Math.hypot(dx, dy);
+        const nx = Math.max(player.r, Math.min(canvas.width - player.r, player.x + (dx / len) * player.spd * spdMult));
+        const ny = Math.max(player.r, Math.min(canvas.height - player.r, player.y + (dy / len) * player.spd * spdMult));
+        const hitObs = obstacles.some(o => rectCircleCollide(o.x, o.y, o.w, o.h, nx, ny, player.r));
+        if (!hitObs) { player.x = nx; player.y = ny; }
+      }
+
+      // Procedural Enemy Waves
+      const spawnInterval = Math.max(18, Math.floor((62 - currentStage * 3) / activeMutation.spawnMult));
+      if (frameCount % spawnInterval === 0) spawnEnemy(false);
+
+      // Auto-Aim & Multi-Projectile Firing
+      if (player.fireCd > 0) player.fireCd--;
+      if (player.fireCd <= 0 && enemies.length > 0) {
+        let nearest = enemies[0];
+        let minDist = Infinity;
+        enemies.forEach(e => {
+          const d = Math.hypot(e.x - player.x, e.y - player.y);
+          if (d < minDist) { minDist = d; nearest = e; }
+        });
+        const baseAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+        for (let i = 0; i < player.projectiles; i++) {
+          const spread = (i - (player.projectiles - 1) / 2) * 0.16;
+          bullets.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(baseAngle + spread) * 8.5,
+            vy: Math.sin(baseAngle + spread) * 8.5,
+            dmg: player.dmg,
+            pierce: player.pierce
+          });
+        }
+        player.fireCd = player.fireDelay;
+      }
+
+      // EMP Nova Pulse
+      if (player.novaLevel > 0 && frameCount % 210 === 0) {
+        enemies.forEach(e => {
+          if (Math.hypot(e.x - player.x, e.y - player.y) < 150 + player.novaLevel * 25) {
+            e.hp -= player.dmg * 1.4;
+          }
+        });
+      }
+
+      // Render Arena
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Grid background
+      ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < canvas.width; gx += 48) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
+      for (let gy = 0; gy < canvas.height; gy += 48) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke(); }
+
+      // Draw Procedural Zones
+      zones.forEach(z => {
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2);
+        ctx.fillStyle = z.type === 'heal' ? 'rgba(16, 185, 129, 0.16)' : z.type === 'haste' ? 'rgba(56, 189, 248, 0.16)' : 'rgba(239, 68, 68, 0.18)';
+        ctx.fill();
+        ctx.strokeStyle = z.type === 'heal' ? '#10b981' : z.type === 'haste' ? '#38bdf8' : '#ef4444';
+        ctx.stroke();
+      });
+
+      // Draw Procedural Obstacles
+      obstacles.forEach(o => {
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.fillRect(o.x, o.y, o.w, o.h);
+        ctx.strokeRect(o.x, o.y, o.w, o.h);
+      });
+
+      // Update & Draw Orbitals
+      for (let i = 0; i < player.orbitals; i++) {
+        const ang = (frameCount * 0.06) + (i * (Math.PI * 2 / player.orbitals));
+        const ox = player.x + Math.cos(ang) * 52;
+        const oy = player.y + Math.sin(ang) * 52;
+        ctx.beginPath();
+        ctx.arc(ox, oy, 7, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+        enemies.forEach(e => {
+          if (Math.hypot(e.x - ox, e.y - oy) < e.r + 8) e.hp -= player.dmg * 0.18;
+        });
+      }
+
+      // Draw Player
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Update & Draw Player Bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#facc15';
+        ctx.fill();
+
+        const hitWall = obstacles.some(o => rectCircleCollide(o.x, o.y, o.w, o.h, b.x, b.y, 4));
+        if (hitWall || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+          bullets.splice(i, 1);
+          continue;
+        }
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
+          if (Math.hypot(e.x - b.x, e.y - b.y) <= e.r + 5) {
+            e.hp -= b.dmg;
+            if (b.pierce > 0) b.pierce--;
+            else { bullets.splice(i, 1); break; }
+          }
+        }
+      }
+
+      // Update & Draw Enemies
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        const ang = Math.atan2(player.y - e.y, player.x - e.x);
+        const nx = e.x + Math.cos(ang) * e.spd;
+        const ny = e.y + Math.sin(ang) * e.spd;
+        if (!obstacles.some(o => rectCircleCollide(o.x, o.y, o.w, o.h, nx, ny, e.r))) {
+          e.x = nx; e.y = ny;
+        } else {
+          e.x += Math.cos(ang + 1.1) * e.spd;
+          e.y += Math.sin(ang + 1.1) * e.spd;
+        }
+
+        // Sniper / Boss ranged shots
+        if (e.kind === 'sniper' || e.isBoss) {
+          e.shootCd--;
+          if (e.shootCd <= 0) {
+            enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(ang) * 4.2, vy: Math.sin(ang) * 4.2 });
+            e.shootCd = e.isBoss ? 45 : 95;
+          }
+        }
+
+        if (Math.hypot(e.x - player.x, e.y - player.y) < e.r + player.r) {
+          player.hp -= e.isBoss ? 0.8 : 0.35;
+          if (player.hp <= 0) {
+            window.CommercialAdBridge.showInterstitial('game_over', () => {
+              openStageModal('💀 PROTOCOL TERMINATED — TRY AGAIN OR UPGRADE!', 'Replay this stage with a brand-new procedural map seed or spend your Gold on permanent upgrades!');
+            });
+            return;
+          }
+        }
+
+        if (e.hp <= 0) {
+          gems.push({ x: e.x, y: e.y, xp: e.isBoss ? 50 : 12, gold: e.isBoss ? 30 : 3 });
+          if (activeMutation.splitter && !e.isSplit && !e.isBoss) {
+            for (let k = 0; k < 2; k++) {
+              enemies.push({ x: e.x + (k * 14 - 7), y: e.y, r: 8, hp: 12, maxHp: 12, spd: 2.6, kind: 'mini', isSplit: true, shootCd: 999 });
+            }
+          }
+          enemies.splice(i, 1);
+          continue;
+        }
+
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fillStyle = e.isBoss ? '#f43f5e' : e.kind === 'tank' ? '#a855f7' : e.kind === 'sniper' ? '#f97316' : '#ef4444';
+        ctx.fill();
+      }
+
+      // Enemy Projectiles
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+        eb.x += eb.vx; eb.y += eb.vy;
+        ctx.beginPath();
+        ctx.arc(eb.x, eb.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#fb7185';
+        ctx.fill();
+        if (Math.hypot(eb.x - player.x, eb.y - player.y) < player.r + 4) {
+          player.hp -= 8;
+          enemyBullets.splice(i, 1);
+          continue;
+        }
+        if (eb.x < 0 || eb.x > canvas.width || eb.y < 0 || eb.y > canvas.height) enemyBullets.splice(i, 1);
+      }
+
+      // XP & Gold Gems
+      for (let i = gems.length - 1; i >= 0; i--) {
+        const g = gems[i];
+        const d = Math.hypot(player.x - g.x, player.y - g.y);
+        if (d < 130) {
+          g.x += ((player.x - g.x) / d) * 5.5;
+          g.y += ((player.y - g.y) / d) * 5.5;
+        }
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#4ade80';
+        ctx.fill();
+        if (d < player.r + 8) {
+          player.xp += g.xp;
+          save.gold += Math.ceil(g.gold * activeMutation.goldMult);
+          gems.splice(i, 1);
+          if (player.xp >= player.xpNext) {
+            player.xp -= player.xpNext;
+            player.xpLv++;
+            player.xpNext = Math.floor(player.xpNext * 1.35);
+            openSkillDraft();
+          }
+          updateHud();
+        }
+      }
+    }
+
+    resetRunForStage(currentStage);
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

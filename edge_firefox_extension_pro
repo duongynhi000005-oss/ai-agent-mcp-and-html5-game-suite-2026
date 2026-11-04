@@ -1,0 +1,365 @@
+const DEFAULT_PROMPTS = [
+  {
+    title: "🛡️ Principal Security & Race-Condition Audit",
+    body: "Act as a Principal Security Engineer. Audit the following {{language}} code for authentication bypasses, path traversal, race conditions, and memory/bounds bugs. Provide exact line numbers and a remediation diff:\n\n{{code}}"
+  },
+  {
+    title: "🚀 High-Converting SaaS / Freelance Proposal",
+    body: "Write a concise, high-trust technical proposal for {{client_project}}. Highlight our immediate PoC architecture, 3-step delivery milestone, and edge-case guarantees."
+  },
+  {
+    title: "🧠 Executive Summary + 5 Actionable Takeaways",
+    body: "Summarize the following article/transcript into: (1) Core Thesis in 2 sentences, (2) 5 High-Impact Bullet Takeaways with metrics, and (3) Immediate Action Items:\n\n{{content}}"
+  },
+  {
+    title: "⚡ Clean Code Refactor & Unit Test Generator",
+    body: "Refactor this {{language}} module for maximum readability, zero cyclomatic bloat, and strict typing, then write comprehensive edge-case unit tests:\n\n{{code}}"
+  }
+];
+
+function setStatus(msg) {
+  const el = document.getElementById('statusMsg');
+  if (el) el.textContent = msg;
+}
+
+// Tab switching
+document.querySelectorAll('#navTabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#navTabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const pane = document.getElementById('tab-' + btn.dataset.tab);
+    if (pane) pane.classList.add('active');
+  });
+});
+
+// Pro Badge
+document.getElementById('proBadge').addEventListener('click', () => {
+  const key = prompt('Enter OmniWork Pro License Key (or get Lifetime Pro at our Gumroad/LemonSqueezy page):');
+  if (key && key.trim().length >= 8) {
+    chrome.storage.local.set({ omniwork_pro: true, omniwork_key: key.trim() }, () => {
+      document.getElementById('proBadge').textContent = '👑 PRO ACTIVE';
+      setStatus('Pro Unlimited Unlocked!');
+    });
+  }
+});
+
+// ================= TAB 1: AI PROMPT VAULT =================
+function applyVars(text) {
+  const rawVars = (document.getElementById('pVars').value || '').split(',').map(s => s.trim()).filter(Boolean);
+  let idx = 0;
+  return text.replace(/\{\{([^}]+)\}\}/g, (match, name) => {
+    const val = rawVars[idx++];
+    return val !== undefined ? val : match;
+  });
+}
+
+function injectIntoPage(text) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    chrome.scripting.executeScript({
+      target: { tabId: tabs[0].id },
+      func: (promptText) => {
+        const el = document.querySelector('#prompt-textarea, textarea, [contenteditable="true"]');
+        if (!el) {
+          navigator.clipboard.writeText(promptText);
+          alert('Copied to clipboard! (No active chat box found on this tab)');
+          return;
+        }
+        el.focus();
+        if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+          el.value = promptText;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        } else {
+          el.innerText = promptText;
+          el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        }
+      },
+      args: [text]
+    });
+    setStatus('⚡ Injected into active tab!');
+  });
+}
+
+function renderPrompts(prompts) {
+  const list = document.getElementById('promptList');
+  document.getElementById('promptCount').textContent = prompts.length + ' templates';
+  list.innerHTML = '';
+  prompts.forEach((p, idx) => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <div class="item-top">
+        <span>${p.title}</span>
+        <div style="display:flex;gap:4px;">
+          <button class="btn green" style="padding:2px 7px;font-size:10px;" data-act="use" data-idx="${idx}">⚡ Inject</button>
+          <button class="btn secondary" style="padding:2px 7px;font-size:10px;" data-act="copy" data-idx="${idx}">📋</button>
+          <button class="btn secondary" style="padding:2px 7px;font-size:10px;" data-act="del" data-idx="${idx}">✕</button>
+        </div>
+      </div>
+      <div class="item-body">${p.body}</div>
+    `;
+    list.appendChild(div);
+  });
+
+  list.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      const i = Number(b.dataset.idx);
+      const act = b.dataset.act;
+      const finalPrompt = applyVars(prompts[i].body);
+      if (act === 'use') injectIntoPage(finalPrompt);
+      if (act === 'copy') {
+        navigator.clipboard.writeText(finalPrompt);
+        setStatus('📋 Copied prompt with variables!');
+      }
+      if (act === 'del') {
+        prompts.splice(i, 1);
+        chrome.storage.local.set({ omniwork_prompts: prompts }, () => renderPrompts(prompts));
+      }
+    });
+  });
+}
+
+chrome.storage.local.get({ omniwork_prompts: DEFAULT_PROMPTS, omniwork_pro: false, omniwork_profile: {}, omniwork_note: '' }, (res) => {
+  renderPrompts(res.omniwork_prompts);
+  if (res.omniwork_pro) document.getElementById('proBadge').textContent = '👑 PRO ACTIVE';
+  if (res.omniwork_profile) {
+    document.getElementById('afName').value = res.omniwork_profile.name || '';
+    document.getElementById('afEmail').value = res.omniwork_profile.email || '';
+    document.getElementById('afPhone').value = res.omniwork_profile.phone || '';
+    document.getElementById('afCompany').value = res.omniwork_profile.company || '';
+    document.getElementById('afBio').value = res.omniwork_profile.bio || '';
+  }
+  if (res.omniwork_note) document.getElementById('pageNoteInput').value = res.omniwork_note;
+});
+
+document.getElementById('btnSavePrompt').addEventListener('click', () => {
+  const title = document.getElementById('pTitle').value.trim();
+  const body = document.getElementById('pBody').value.trim();
+  if (!title || !body) return setStatus('⚠️ Enter title and prompt template');
+  chrome.storage.local.get({ omniwork_prompts: DEFAULT_PROMPTS }, (res) => {
+    const next = [{ title, body }, ...res.omniwork_prompts];
+    chrome.storage.local.set({ omniwork_prompts: next }, () => {
+      document.getElementById('pTitle').value = '';
+      document.getElementById('pBody').value = '';
+      renderPrompts(next);
+      setStatus('✅ Saved template!');
+    });
+  });
+});
+
+document.getElementById('btnInjectPrompt').addEventListener('click', () => {
+  const body = document.getElementById('pBody').value.trim();
+  if (!body) return setStatus('⚠️ Write a prompt or click Inject on a saved card');
+  injectIntoPage(applyVars(body));
+});
+
+// ================= TAB 2: WEB EXTRACTOR & CLIPPER =================
+function runInActiveTab(fn, cb) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    chrome.scripting.executeScript({ target: { tabId: tabs[0].id }, func: fn }, (results) => {
+      if (results && results[0]) cb(results[0].result);
+    });
+  });
+}
+
+document.getElementById('btnExtractMd').addEventListener('click', () => {
+  runInActiveTab(() => {
+    const title = document.title;
+    const url = location.href;
+    const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => h.tagName + ': ' + h.innerText.trim()).slice(0, 30).join('\n');
+    const bodyText = (document.querySelector('article, main') || document.body).innerText.replace(/\n{3,}/g, '\n\n').slice(0, 12000);
+    return `# ${title}\nURL: ${url}\n\n## Outline\n${headings}\n\n## Content\n${bodyText}`;
+  }, (md) => {
+    document.getElementById('extractorOutput').value = md || '';
+    setStatus('📄 Extracted clean Markdown from page!');
+  });
+});
+
+document.getElementById('btnExtractLinks').addEventListener('click', () => {
+  runInActiveTab(() => {
+    const links = Array.from(document.querySelectorAll('a[href]'))
+      .map(a => `- [${(a.innerText || a.href).trim().slice(0, 60)}](${a.href})`)
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+      .slice(0, 100)
+      .join('\n');
+    return `# Extracted Links (${location.hostname})\n\n${links}`;
+  }, (out) => {
+    document.getElementById('extractorOutput').value = out || '';
+    setStatus('🔗 Extracted top 100 unique links!');
+  });
+});
+
+document.getElementById('btnBuildSummaryPrompt').addEventListener('click', () => {
+  const md = document.getElementById('extractorOutput').value.trim();
+  const promptText = `Summarize the following web page into: (1) 3-sentence Executive Summary, (2) Key Technical/Business Facts, and (3) Actionable Next Steps:\n\n${md || '[Click Extract Page first]'}`;
+  document.getElementById('extractorOutput').value = promptText;
+  navigator.clipboard.writeText(promptText);
+  setStatus('🧠 Summary prompt copied to clipboard!');
+});
+
+document.getElementById('btnCopyExtracted').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('extractorOutput').value);
+  setStatus('📋 Copied extracted content!');
+});
+
+// ================= TAB 3: DEVTOOLS SWISS-ARMY KNIFE =================
+document.getElementById('btnRunDevTool').addEventListener('click', () => {
+  const mode = document.getElementById('devToolMode').value;
+  const input = document.getElementById('devInput').value.trim();
+  const outEl = document.getElementById('devOutput');
+  try {
+    if (mode === 'json') {
+      const parsed = JSON.parse(input);
+      outEl.value = JSON.stringify(parsed, null, 2);
+    } else if (mode === 'jwt') {
+      const parts = input.split('.');
+      if (parts.length < 2) throw new Error('Invalid JWT format (expected header.payload.signature)');
+      const decodePart = (s) => JSON.parse(atob(s.replace(/-/g, '+').replace(/_/g, '/')));
+      const header = decodePart(parts[0]);
+      const payload = decodePart(parts[1]);
+      const expInfo = payload.exp ? new Date(payload.exp * 1000).toISOString() : 'No exp claim';
+      outEl.value = JSON.stringify({ header, payload, expiresAt_ISO: expInfo }, null, 2);
+    } else if (mode === 'b64d') {
+      outEl.value = decodeURIComponent(escape(atob(input)));
+    } else if (mode === 'b64e') {
+      outEl.value = btoa(unescape(encodeURIComponent(input)));
+    } else if (mode === 'urld') {
+      outEl.value = decodeURIComponent(input);
+    } else if (mode === 'epoch') {
+      if (/^\d+$/.test(input)) {
+        const ms = input.length <= 10 ? Number(input) * 1000 : Number(input);
+        outEl.value = `ISO-8601 UTC: ${new Date(ms).toISOString()}\nLocal Time:   ${new Date(ms).toString()}\nUnix Seconds: ${Math.floor(ms / 1000)}`;
+      } else {
+        const d = new Date(input);
+        outEl.value = `Unix Seconds: ${Math.floor(d.getTime() / 1000)}\nUnix Millis:  ${d.getTime()}\nISO-8601 UTC: ${d.toISOString()}`;
+      }
+    }
+    setStatus('✅ DevTool transformation complete!');
+  } catch (err) {
+    outEl.value = 'Error: ' + err.message;
+    setStatus('⚠️ Format error');
+  }
+});
+
+document.getElementById('btnCopyDevOutput').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('devOutput').value);
+  setStatus('📋 Copied DevTool result!');
+});
+
+// ================= TAB 4: SMART FORM AUTO-FILLER =================
+document.getElementById('btnSaveProfile').addEventListener('click', () => {
+  const profile = {
+    name: document.getElementById('afName').value.trim(),
+    email: document.getElementById('afEmail').value.trim(),
+    phone: document.getElementById('afPhone').value.trim(),
+    company: document.getElementById('afCompany').value.trim(),
+    bio: document.getElementById('afBio').value.trim()
+  };
+  chrome.storage.local.set({ omniwork_profile: profile }, () => setStatus('💾 Saved Auto-Fill Profile!'));
+});
+
+document.getElementById('btnFillActiveForm').addEventListener('click', () => {
+  const profile = {
+    name: document.getElementById('afName').value.trim(),
+    email: document.getElementById('afEmail').value.trim(),
+    phone: document.getElementById('afPhone').value.trim(),
+    company: document.getElementById('afCompany').value.trim(),
+    bio: document.getElementById('afBio').value.trim()
+  };
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    chrome.scripting.executeScript({
+      target: { tabId: tabs[0].id },
+      func: (p) => {
+        const setVal = (el, val) => {
+          if (!el || !val) return;
+          el.focus();
+          el.value = val;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        document.querySelectorAll('input, textarea').forEach(el => {
+          const k = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.type || '')).toLowerCase();
+          if (k.includes('email')) setVal(el, p.email);
+          else if (k.includes('phone') || k.includes('tel')) setVal(el, p.phone);
+          else if (k.includes('company') || k.includes('org') || k.includes('website') || k.includes('url')) setVal(el, p.company);
+          else if (k.includes('name') || k.includes('user')) setVal(el, p.name);
+          else if (el.tagName === 'TEXTAREA' || k.includes('bio') || k.includes('message') || k.includes('cover')) setVal(el, p.bio);
+        });
+      },
+      args: [profile]
+    });
+    setStatus('🪄 Auto-filled form fields on active tab!');
+  });
+});
+
+// ================= TAB 5: READER MODE & NOTES =================
+document.getElementById('btnToggleReader').addEventListener('click', () => {
+  runInActiveTab(() => {
+    const existing = document.getElementById('omniwork-reader-overlay');
+    if (existing) { existing.remove(); return 'Reader Mode OFF'; }
+    const article = (document.querySelector('article, main') || document.body).innerText;
+    const overlay = document.createElement('div');
+    overlay.id = 'omniwork-reader-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0f172a;color:#f1f5f9;overflow-y:auto;padding:48px 18%;font-family:Georgia,serif;font-size:20px;line-height:1.75;';
+    overlay.innerHTML = `<div style="max-width:760px;margin:0 auto;"><button onclick="this.parentElement.parentElement.remove()" style="float:right;background:#ef4444;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-family:sans-serif;">✕ Close Reader</button><h1 style="font-size:30px;margin-bottom:20px;color:#38bdf8;">${document.title}</h1><div style="white-space:pre-wrap;">${article.replace(/</g, '&lt;')}</div></div>`;
+    document.body.appendChild(overlay);
+    return 'Reader Mode ON';
+  }, (res) => setStatus('📖 ' + (res || 'Toggled Reader Mode')));
+});
+
+document.getElementById('btnHighlightSelection').addEventListener('click', () => {
+  runInActiveTab(() => window.getSelection().toString(), (sel) => {
+    if (!sel) return setStatus('⚠️ Select some text on the webpage first!');
+    const box = document.getElementById('pageNoteInput');
+    box.value = (box.value ? box.value + '\n\n' : '') + '> ' + sel.trim();
+    chrome.storage.local.set({ omniwork_note: box.value });
+    setStatus('🖍️ Captured selected quote into notes!');
+  });
+});
+
+document.getElementById('btnSaveNote').addEventListener('click', () => {
+  const val = document.getElementById('pageNoteInput').value;
+  chrome.storage.local.set({ omniwork_note: val }, () => setStatus('💾 Saved note!'));
+});
+
+document.getElementById('btnExportNotes').addEventListener('click', () => {
+  const val = document.getElementById('pageNoteInput').value;
+  navigator.clipboard.writeText(val);
+  setStatus('⬇️ Copied all Markdown notes to clipboard!');
+});
+
+// ================= TAB 6: POMODORO FOCUS TIMER =================
+let pomoSeconds = 25 * 60;
+let pomoTimer = null;
+const pomoEl = document.getElementById('pomoDisplay');
+function updatePomoUI() {
+  const m = String(Math.floor(pomoSeconds / 60)).padStart(2, '0');
+  const s = String(pomoSeconds % 60).padStart(2, '0');
+  pomoEl.textContent = m + ':' + s;
+}
+document.getElementById('btnPomoStart').addEventListener('click', () => {
+  if (pomoTimer) {
+    clearInterval(pomoTimer);
+    pomoTimer = null;
+    setStatus('⏸️ Pomodoro paused');
+  } else {
+    pomoTimer = setInterval(() => {
+      if (pomoSeconds > 0) { pomoSeconds--; updatePomoUI(); }
+      else { clearInterval(pomoTimer); pomoTimer = null; setStatus('🎉 Focus session complete!'); }
+    }, 1000);
+    setStatus('🔥 Deep-Work Focus running...');
+  }
+});
+document.getElementById('btnPomoReset').addEventListener('click', () => {
+  if (pomoTimer) { clearInterval(pomoTimer); pomoTimer = null; }
+  pomoSeconds = 25 * 60;
+  updatePomoUI();
+});
+document.getElementById('btnPomoBreak').addEventListener('click', () => {
+  if (pomoTimer) { clearInterval(pomoTimer); pomoTimer = null; }
+  pomoSeconds = 5 * 60;
+  updatePomoUI();
+});
