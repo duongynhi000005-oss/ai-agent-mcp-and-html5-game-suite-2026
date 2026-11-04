@@ -6,7 +6,7 @@
     "duongynhi000005-oss"
   ],
   "endpoints": {
-    "streamableHttp": "https://ai-agent-mcp-scraper-seo-security-pro.duongynhi000005.workers.dev/mcp",
-    "openapi": "https://ai-agent-mcp-scraper-seo-security-pro.duongynhi000005.workers.dev/openapi.json"
+    "streamableHttp": "https://ai-agent-mcp-scraper-seo-security-pro.antibot-scraper-worker.workers.dev/mcp",
+    "openapi": "https://ai-agent-mcp-scraper-seo-security-pro.antibot-scraper-worker.workers.dev/openapi.json"
   }
 }

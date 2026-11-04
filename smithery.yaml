@@ -6,4 +6,4 @@ startCommand:
       apiKey:
         type: string
         description: Optional Pro API Key for unlimited high-rate calls
-  url: https://ai-agent-mcp-scraper-seo-security-pro.duongynhi000005.workers.dev/mcp
+  url: https://ai-agent-mcp-scraper-seo-security-pro.antibot-scraper-worker.workers.dev/mcp
