@@ -1,0 +1,12 @@
+{
+  "actorSpecification": 1,
+  "name": "ai-agent-clean-markdown-seo-security-auditor",
+  "title": "AI Agent Clean Markdown Scraper, SEO & OWASP Security Auditor (PPE)",
+  "description": "Scrapes clean LLM-ready Markdown, audits technical SEO & Core Vitals metadata, and scans OWASP HTTP security headers.",
+  "version": "1.0",
+  "meta": {
+    "templateId": "js-start"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "./Dockerfile"
+}

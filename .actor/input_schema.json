@@ -1,0 +1,17 @@
+{
+  "title": "AI Agent Scraper & SEO/Security Auditor Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "url": {
+      "title": "Target URL",
+      "type": "string",
+      "description": "URL to scrape and audit",
+      "editor": "textfield",
+      "prefill": "https://example.com"
+    }
+  },
+  "required": [
+    "url"
+  ]
+}

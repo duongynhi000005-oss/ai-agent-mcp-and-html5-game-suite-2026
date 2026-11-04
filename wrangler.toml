@@ -1,0 +1,4 @@
+name = "ai-agent-mcp-scraper-seo-security-pro"
+main = "index.js"
+compatibility_date = "2026-01-01"
+workers_dev = true

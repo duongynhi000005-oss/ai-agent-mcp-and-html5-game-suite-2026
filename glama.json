@@ -1,0 +1,12 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "name": "ai-agent-mcp-scraper-seo-security-pro",
+  "description": "4-in-1 Remote MCP Server & AI Agent Toolkit: Clean Markdown Web Scraper, SEO Core Vitals & Metadata Auditor, HTTP Security Headers & Exposure Scanner, and On-Chain Token Risk Intel.",
+  "maintainers": [
+    "duongynhi000005-oss"
+  ],
+  "endpoints": {
+    "streamableHttp": "https://ai-agent-mcp-scraper-seo-security-pro.duongynhi000005.workers.dev/mcp",
+    "openapi": "https://ai-agent-mcp-scraper-seo-security-pro.duongynhi000005.workers.dev/openapi.json"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ai-agent-mcp-scraper-seo-security-pro",
+  "version": "1.0.0",
+  "description": "Production MCP Server (JSON-RPC 2.0) + REST API for AI Agents: Clean Markdown Web Scraper, Technical SEO Auditor, Security Headers & CVE Exposure Scanner, and DeFi Token Risk Analyzer.",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "web-scraper",
+    "seo-audit",
+    "security-scanner",
+    "x402",
+    "rapidapi"
+  ],
+  "license": "MIT"
+}
