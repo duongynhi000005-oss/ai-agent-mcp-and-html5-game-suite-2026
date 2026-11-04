@@ -8,5 +8,31 @@
     "templateId": "js-start"
   },
   "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {
+    "dataset": {
+      "actorSpecification": 1,
+      "title": "Audit & Markdown Results",
+      "views": {
+        "overview": {
+          "title": "Overview",
+          "transformation": {
+            "fields": ["url", "title", "seoScore", "securityGrade", "wordCount", "markdown"]
+          },
+          "display": {
+            "component": "table",
+            "properties": {
+              "url": { "label": "Target URL", "format": "link" },
+              "title": { "label": "Page Title", "format": "text" },
+              "seoScore": { "label": "SEO Score", "format": "number" },
+              "securityGrade": { "label": "Security Grade", "format": "text" },
+              "wordCount": { "label": "Words", "format": "number" },
+              "markdown": { "label": "Clean Markdown", "format": "text" }
+            }
+          }
+        }
+      }
+    }
+  },
   "dockerfile": "./Dockerfile"
 }

@@ -1,0 +1,11 @@
+{
+  "actorOutputSchemaVersion": 1,
+  "title": "AI Agent Clean Markdown, SEO & Security Audit Output",
+  "properties": {
+    "overview": {
+      "type": "string",
+      "title": "Audit Overview & Clean Markdown Dataset",
+      "template": "{{links.apiDefaultDatasetUrl}}/items"
+    }
+  }
+}
